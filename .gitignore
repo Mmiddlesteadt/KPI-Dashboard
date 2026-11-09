@@ -1,0 +1,19 @@
+# ---- Customer data must never be committed ----
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
+
+# Dummy workbook used for testing is the only exception
+!sample_data/Sample_*.xlsx
+
+# Python / OS clutter
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+Thumbs.db
