@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WTDC monthly warehouse report</title>
 <style>/* Public Sans (SIL Open Font License 1.1), embedded so the report never contacts the internet */
@@ -247,7 +248,21 @@ footer{padding:26px 56px 34px;border-top:1px solid var(--line);color:var(--ink-3
   body{font-size:12px}
 }
 </style>
-</head>
+<style>
+@media(prefers-color-scheme:light){:root{--stock:#002d62;--out:#9b7325;--focus:#002d62}}
+.report-label{color:#9b7325;font-size:11px;font-weight:700;letter-spacing:.15em;margin:0 0 18px}
+.bar{border-top:3px solid #ab8820}.mark{color:var(--stock)}
+.inventory-flow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.flow-card{padding:16px;background:var(--soft);border:1px solid var(--line);border-radius:8px}
+.flow-card span,.flow-card small{display:block;font-size:12px;color:var(--ink-2)}
+.flow-card strong{display:block;font-size:27px;margin:9px 0;color:var(--stock)}
+.flow-card.incoming strong{color:var(--in)}.flow-card.outgoing strong{color:var(--out)}
+.flow-card.closing{border-bottom:3px solid #ab8820}
+.provenance{margin-top:30px}.provenance td{white-space:normal}.provenance .sub{overflow-wrap:anywhere}
+#draftNotice:not(:empty){padding:14px;border:2px solid #a5421e;color:#a5421e;margin-bottom:20px;font-weight:700}
+@media(max-width:500px){.flow-card{padding:12px}.flow-card strong{font-size:23px}}
+@media print{.inventory-flow{break-inside:avoid}#draftNotice{display:block!important}}
+</style></head>
 <body>
 <header class="bar">
   <div class="bar-in">
@@ -268,7 +283,7 @@ footer{padding:26px 56px 34px;border-top:1px solid var(--line);color:var(--ink-3
 <main class="sheet">
   <!-- SUMMARY -->
   <section id="summary" aria-labelledby="t-summary">
-    <div class="head">
+    <div id="draftNotice" role="status"></div><p class="report-label">WTDC · CUSTOMER INVENTORY REPORT</p><div class="head">
       <div>
         <h1 id="t-summary"></h1>
         <p class="who" id="who"></p>
@@ -282,7 +297,7 @@ footer{padding:26px 56px 34px;border-top:1px solid var(--line);color:var(--ink-3
       </div>
       <div class="block">
         <h3>How inventory changed this month</h3>
-        <div class="chart" id="bridge" role="img"></div>
+        <div id="bridge" class="inventory-flow"></div>
         <details class="how"><summary>How this is calculated</summary><div class="body" id="howBridge"></div></details>
       </div>
     </div>
@@ -461,6 +476,18 @@ footer{padding:26px 56px 34px;border-top:1px solid var(--line);color:var(--ink-3
     <h2 id="t-d">Definitions</h2>
     <p class="lede">What each term in this report means.</p>
     <dl class="defs" id="defs"></dl>
+    <div class="block provenance"><h3>Where the figures come from</h3>
+    <p>All figures are a fixed snapshot of the supplied workbook. Search, sorting and expanded rows affect only their own table; headline totals remain the full reporting period.</p>
+    <table><thead><tr><th>Report section</th><th>Source worksheet</th><th>Calculation / scope</th></tr></thead><tbody>
+    <tr><td>Inventory movement &amp; products</td><td>In Out Summary</td><td>Sum product rows; opening + received − shipped = closing.</td></tr>
+    <tr><td>Receipts, shipments &amp; destinations</td><td>In Out Detailed</td><td>Sum line quantities by product and receipt / release. Destruction is included in shipped inventory.</td></tr>
+    <tr><td>Monthly &amp; prior-year volumes</td><td>Inbound Comparison / Outbound Comparison</td><td>Reported cases per month; blank months are unavailable, not zero.</td></tr>
+    <tr><td>Closing stock &amp; quality</td><td>Overview</td><td>Reported monthly values. Accuracy with no count or audit has no result.</td></tr>
+    <tr><td>Delivery time</td><td>KPI</td><td>Orders delivered within this period, including orders created earlier. NETWORKDAYS(creation, delivery) − 1; weekdays, no holidays.</td></tr>
+    <tr><td>Older stock</td><td>Inventory &gt;1 Year</td><td>Only supplied rows older than 365 calendar days at period end. Pallet quantities are summed.</td></tr>
+    <tr><td>Safety &amp; emissions</td><td>Days Accident Free / CO2</td><td>Reported safety value and estimated emissions for tracked deliveries only.</td></tr>
+    </tbody></table><p id="sourceIdentity" class="sub"></p>
+    <p class="sub">Confidential customer copy · Opens offline · No uploads or connection to WTDC required.</p></div>
   </section>
 
   <footer>
@@ -502,6 +529,8 @@ const plural = (n, one, many) => f(n) + " " + (n === 1 ? one : (many || one + "s
 
 /* ---------- derived numbers ---------- */
 const M = R.meta;
+document.title = `WTDC | ${M.customer} | ${MONTH[M.month-1]} ${M.year}`;
+if(M.draft) $("draftNotice").textContent = "DRAFT · Internal review only. Source validation issues remain unresolved.";
 const mIdx = M.month - 1, yr = String(M.year);
 const monthName = MONTH[mIdx], monthYear = monthName + " " + M.year;
 const prevMonthName = MONTH[(mIdx + 11) % 12];
@@ -517,13 +546,14 @@ const destOf = {}; R.shipments.forEach(s => destOf[s.release] = s.consignee);
 const isDestruction = c => /destruct/i.test(c || "");
 const destructionIds = shipmentIds.filter(id => isDestruction(destOf[id]));
 const destructionCases = sum(destructionIds.map(id => casesByRelease[id]));
-const O = R.orders.map(o => ({...o, cases: casesByRelease[o.release] ?? null,
-  total: [o.d1,o.d2,o.d3].every(v => v != null) ? o.d1 + o.d2 + o.d3 : null}));
+const O = R.orders.filter(o => o.delivered && o.delivered >= M.start && o.delivered <= M.end).map(o => ({...o, cases: casesByRelease[o.release] ?? null,
+  total: o.totalDays}));
 const shippedPOs = ovNow(/^PO'?s Shipped$/i), badPOs = ovNow(/shipped incorrectly/i), shipAcc = ovNow(/^Shipping Accuracy %$/i);
 const dmgTotal = ovNow(/^Total Damage/i), dmgWTDC = ovNow(/^WTDC Damaged/i), dmgArrived = ovNow(/unloaded/i);
 const periodEnd = pd(M.end);
-const ageDays = s => Math.round((periodEnd - pd(s)) / 86400000);
-const agedTotal = sum(R.aged, "pcs");
+const ageDays = s => s ? Math.round((Date.parse(M.end + "T00:00:00Z") - Date.parse(s + "T00:00:00Z")) / 86400000) : null;
+const qualifyingAged = R.aged.filter(a => a.date && ageDays(a.date) > 365);
+const agedTotal = sum(qualifyingAged, "pcs");
 const co2Tonnes = sum(R.co2, "tonnes");
 
 /* ---------- tooltip ---------- */
@@ -621,36 +651,15 @@ $("facts").innerHTML = `<span>Reporting period</span><b>${fd(M.start).replace(/,
 })();
 
 function drawBridge(){
-  const host = $("bridge"); const W = Math.max(300, host.clientWidth), H = 250, pad = {l:8, r:8, t:28, b:46};
-  const iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
-  const max = Math.max(T.start, T.start + T.inb, T.end) * 1.12;
-  const y = v => pad.t + ih - ih * v / max;
-  const steps = [
-    {lab:"Opening stock", sub:"start of " + MON[mIdx], a:0, b:T.start, cls:"f-stock", v:f(T.start)},
-    {lab:"Received", sub:plural(receipts,"receipt"), a:T.start, b:T.start + T.inb, cls:"f-in", v:"+" + f(T.inb)},
-    {lab:"Shipped", sub:plural(shipmentIds.length,"shipment"), a:T.start + T.inb - T.out, b:T.start + T.inb, cls:"f-out", v:"−" + f(T.out)},
-    {lab:"Closing stock", sub:"end of " + MON[mIdx], a:0, b:T.end, cls:"f-stock", v:f(T.end)}
-  ];
-  const s = svg(W, H, `Opening stock ${f(T.start)} cases, plus ${f(T.inb)} received, minus ${f(T.out)} shipped, equals closing stock ${f(T.end)} cases.`);
-  const band = iw / 4, bw = Math.min(110, band * .58);
-  el(s, "line", {x1:pad.l, x2:W-pad.r, y1:y(0), y2:y(0), class:"base"});
-  steps.forEach((st, i) => {
-    const cx = pad.l + band * i + band / 2, x = cx - bw/2;
-    const top = y(st.b), h = Math.max(2, y(st.a) - y(st.b));
-    const r = el(s, "rect", {x, y:top, width:bw, height:h, class:st.cls + " hit", rx:2});
-    r.dataset.tip = `${st.lab}\n${st.v} cases`;
-    el(s, "text", {x:cx, y:top - 9, "text-anchor":"middle", class:"vlbl", style:"font-size:14px"}, st.v);
-    el(s, "text", {x:cx, y:H - 26, "text-anchor":"middle", class:"vlbl", style:"font-weight:500;fill:var(--ink)"}, st.lab);
-    el(s, "text", {x:cx, y:H - 9, "text-anchor":"middle", class:"lbl"}, st.sub);
-    if(i < 3){
-      const level = i === 0 ? T.start : i === 1 ? T.start + T.inb : T.end;
-      el(s, "line", {x1:cx + bw/2, x2:cx + band - bw/2, y1:y(level), y2:y(level), stroke:"var(--ink-3)", "stroke-dasharray":"3 3"});
-    }
-  });
-  host.replaceChildren(s);
+  $("bridge").innerHTML = [
+    ["Opening inventory", T.start, "Start of reporting period", ""],
+    ["+ Cases received", T.inb, "Added to inventory", "incoming"],
+    ["− Cases shipped", T.out, "Removed from inventory", "outgoing"],
+    ["Closing inventory", T.end, "End of reporting period", "closing"]
+  ].map(([label, value, note, cls]) => `<div class="flow-card ${cls}"><span>${label}</span><strong>${f(value)}</strong><small>${note}</small></div>`).join("");
 }
 $("howBridge").innerHTML = `<p><span class="formula">Opening stock + Received − Shipped = Closing stock</span></p>
-  <p>${f(T.start)} + ${f(T.inb)} − ${f(T.out)} = ${f(T.start + T.inb - T.out)} cases. This adds up exactly for every one of the ${P.length} part numbers listed under Products.</p>
+  <p>${f(T.start)} + ${f(T.inb)} − ${f(T.out)} = ${f(T.start + T.inb - T.out)} cases. ${P.every(p => p.start + p.inb - p.out === p.end) ? "All product balances reconcile." : "Some product balances require review; this is a draft."}</p>
   <p>Opening stock is the count on hand at the start of ${monthName}, which is the same as the closing stock reported for ${prevMonthName}. Received counts every case booked into the warehouse during the month; shipped counts every case released out, including any released for destruction.</p>`;
 
 (function figs(){
@@ -714,7 +723,8 @@ $("howYoy").innerHTML = `<p>Monthly totals of cases received or shipped for ${es
 /* ---------- orders ---------- */
 const totals = O.map(o => o.total).filter(v => v != null);
 const avgT = totals.length ? sum(totals) / totals.length : null, medT = median(totals);
-const avg = k => { const v = O.map(o => o[k]).filter(x => x != null); return v.length ? sum(v)/v.length : null; };
+const validStageOrders = O.filter(o => o.validStages);
+const avg = k => { const v = validStageOrders.map(o => o[k]).filter(x => x != null); return v.length ? sum(v)/v.length : null; };
 const a1 = avg("d1"), a2 = avg("d2"), a3 = avg("d3");
 const ordCases = sum(O.map(o => o.cases || 0));
 $("ordersLede").textContent = `${plural(O.length,"customer order")} delivered in ${monthName}, timed from the day the order was created to the day it was delivered.` + (destructionIds.length ? ` The ${plural(destructionIds.length,"release")} for destruction ${destructionIds.length === 1 ? "is" : "are"} not customer orders and ${destructionIds.length === 1 ? "is" : "are"} not included here.` : "");
@@ -729,12 +739,12 @@ $("orderStats").innerHTML = [
   const parts = [{k:"Created to confirmed", v:a1, c:"s1"}, {k:"Confirmed to picked", v:a2, c:"s2"}, {k:"Picked to delivered", v:a3, c:"s3"}];
   const tot = sum(parts.map(p => Math.max(0, p.v || 0)));
   const biggest = parts.slice().sort((a,b) => b.v - a.v)[0];
-  $("takeStages").textContent = `An order takes ${f1(avgT)} business days on average. The longest step is ${biggest.k.toLowerCase()}, at ${f1(biggest.v)} days.`;
+  $("takeStages").textContent = `Creation to delivery averages ${f1(avgT)} business days across completed orders. The longest step is ${biggest.k.toLowerCase()}, at ${f1(biggest.v)} days.`;
   $("stages").innerHTML = `<div class="stage">${parts.map(p => `<div class="${p.c}" style="flex:${Math.max(.0001, p.v)}" data-tip="${p.k}\nAverage ${f1(p.v)} business days">${f1(p.v)}</div>`).join("")}</div>
     <div class="hb" style="grid-template-columns:auto 1fr auto;margin-top:12px">${parts.map(p => `<span class="n"><i class="sw ${p.c}" style="background:${p.c==="s1"?"var(--stock)":p.c==="s2"?"var(--in)":"var(--out)"}"></i>${p.k}</span><span></span><span class="v">${f1(p.v)} days <small>${shareOf(p.v/tot)}</small></span>`).join("")}</div>`;
   $("howStages").innerHTML = `<p>Each order records four dates: <b>created</b> (order entered), <b>confirmed</b> (order confirmed for release), <b>picked</b> (cases picked and staged in the warehouse) and <b>delivered</b>.</p>
     <p>Each step counts business days between two dates, Monday to Friday, not counting the start day. An order created on Monday and confirmed on Wednesday counts as 2 days. Public holidays are counted as business days.</p>
-    <p>Each bar is the average of that step across all ${f(O.length)} orders. Total time is the sum of the three steps.</p>`;
+    <p>Step averages include ${f(validStageOrders.length)} orders with complete dates in chronological order; ${f(O.length - validStageOrders.length)} are excluded from these step averages. Overall delivery time is calculated directly from creation to delivery and includes ${f(totals.length)} completed orders. Weekdays only; no holiday calendar is applied.</p>`;
 })();
 
 (function dist(){
@@ -744,7 +754,7 @@ $("orderStats").innerHTML = [
   hbars($("dist"), rows, {color:"var(--stock)", share: totals.length});
   const slow = O.filter(o => o.total > 20).sort((a,b) => b.total - a.total);
   $("takeDist").textContent = `${f(rows[0].value + (rows[1]?.value||0))} of ${f(totals.length)} orders were delivered within 10 business days.` + (slow.length ? ` The longest, order ${slow[0].release} to ${slow[0].consignee}, took ${f(slow[0].total)} days.` : "");
-  $("howDist").innerHTML = `<p>Orders grouped by total business days from creation to delivery (the sum of the three steps). The percentage is each group’s share of the ${f(totals.length)} orders delivered this month.</p>`;
+  $("howDist").innerHTML = `<p>Orders grouped by total business days from creation to delivery. Totals are calculated directly from creation to delivery. The percentage is each group’s share of the ${f(totals.length)} orders delivered this month.</p>`;
 })();
 
 (function dest(){
@@ -754,7 +764,7 @@ $("orderStats").innerHTML = [
   hbars($("dest"), rows, {share: T.out});
   const top = rows.filter(r => !/destruction/i.test(r.label)).slice(0,2);
   const nDest = rows.filter(r => !/destruction/i.test(r.label)).length;
-  $("takeDest").textContent = `${nDest} destinations received product this month. ${top.map(r => r.label).join(" and ")} together took ${pc((top[0].value + (top[1]?.value||0)) / T.out, 0)} of all cases shipped.`;
+  $("takeDest").textContent = `${nDest} destinations received product this month. ${top.map(r => r.label).join(" and ")} together took ${pc(((top[0]?.value||0) + (top[1]?.value||0)) / T.out, 0)} of all cases shipped.`;
   $("howDest").innerHTML = `<p>Every case shipped in ${monthName}, grouped by the consignee named on the shipment. Percentages are each destination’s share of the ${f(T.out)} cases shipped. Destruction releases are shown in grey; they leave inventory but are not customer orders.</p>`;
 })();
 
@@ -833,7 +843,7 @@ drawOrders();
   $("howQuality").innerHTML = `
     <p><b>Shipping accuracy</b> <span class="formula">(shipments − shipments reported shipped incorrectly) ÷ shipments</span>. A shipment counts as incorrect when a wrong product, quantity or destination is reported after it leaves.</p>
     <p><b>Damaged cases</b> are split between damage that happened in WTDC’s care and cases found damaged when a container or truck was unloaded on arrival.</p>
-    <p><b>Unit accuracy</b> <span class="formula">1 − (cases adjusted ÷ cases counted)</span>, and <b>location accuracy</b> <span class="formula">1 − (locations adjusted ÷ locations counted)</span>, from cycle counts. Pallet audit accuracy is <span class="formula">1 − (failed ÷ audited)</span>. A month with no count or audit shows a dash, not 0%.</p>
+    <p><b>Unit accuracy</b> <span class="formula">1 − (absolute quantity adjusted ÷ cases counted)</span>, and <b>location accuracy</b> <span class="formula">1 − (locations adjusted ÷ locations counted)</span>, from cycle counts. Pallet audit accuracy is <span class="formula">1 − (failed ÷ audited)</span>. A month with no count or audit shows a dash, not 0%.</p>
     <p><b>Transport CO₂</b> <span class="formula">weight in short tons × miles × ${f1(R.co2[0]?.factor ?? 161.8)} g CO₂ per ton-mile</span>, converted to kilograms. This month it covers the deliveries below.${co2rows ? "<br>" + co2rows : ""}</p>`;
 })();
 
@@ -886,12 +896,12 @@ $("howProducts").innerHTML = `<p>For each part number: <span class="formula">Ope
 
 /* ---------- aged stock ---------- */
 (function aged(){
-  const A = R.aged.map(a => ({...a, age: ageDays(a.date)}));
+  const A = qualifyingAged.map(a => ({...a, age: ageDays(a.date)}));
   const share = T.end ? agedTotal / T.end : 0;
   const products = new Set(A.map(a => a.part)).size;
-  const cutoff = new Date(periodEnd); cutoff.setFullYear(cutoff.getFullYear() - 1);
-  $("agedLede").textContent = `${f(agedTotal)} cases across ${plural(products,"product")} were received more than a year before ${fd(M.end)} and are still in stock. Ages are measured to the last day of the reporting period.`;
-  const bands = [{label:"1 to 2 years", lo:365, hi:730}, {label:"2 to 3 years", lo:731, hi:1095}, {label:"3 to 4 years", lo:1096, hi:1460}, {label:"More than 4 years", lo:1461, hi:Infinity}];
+  const cutoff = new Date(periodEnd); cutoff.setDate(cutoff.getDate() - 365);
+  $("agedLede").textContent = `${f(agedTotal)} cases across ${plural(products,"product")} in the aging worksheet were received more than a year before ${fd(M.end)} and are still in stock. Ages are measured to the last day of the reporting period.`;
+  const bands = [{label:"1 to 2 years", lo:366, hi:730}, {label:"2 to 3 years", lo:731, hi:1095}, {label:"3 to 4 years", lo:1096, hi:1460}, {label:"More than 4 years", lo:1461, hi:Infinity}];
   const brows = bands.map(b => ({label:b.label, value: sum(A.filter(a => a.age >= b.lo && a.age <= b.hi), "pcs")}));
   while(brows.length > 1 && brows[brows.length-1].value === 0) brows.pop();
   hbars($("bands"), brows, {color:"var(--stock)", share: agedTotal});
@@ -899,10 +909,10 @@ $("howProducts").innerHTML = `<p>For each part number: <span class="formula">Ope
   $("takeBands").textContent = `${pc(brows[0].value/agedTotal,0)} of this stock is between one and two years old.` + (old3 ? ` ${f(old3)} cases have been stored for more than three years.` : "");
   // share donut-free: a single stacked bar
   const host = $("share");
-  host.innerHTML = `<div class="stage" style="height:42px"><div style="flex:${agedTotal};background:var(--stock)" data-tip="Received more than a year ago\n${f(agedTotal)} cases">${pc(share,0)}</div><div style="flex:${T.end - agedTotal};background:var(--stock-soft);color:var(--ink)" data-tip="Received in the last 12 months\n${f(T.end - agedTotal)} cases">${pc(1-share,0)}</div></div>
+  host.innerHTML = `<div class="stage" style="height:42px"><div style="flex:${agedTotal};background:var(--stock)" data-tip="Received more than a year ago\n${f(agedTotal)} cases">${pc(share,0)}</div><div style="flex:${T.end - agedTotal};background:var(--stock-soft);color:var(--ink)" data-tip="Other closing inventory; ages not established by this worksheet\n${f(T.end - agedTotal)} cases">${pc(1-share,0)}</div></div>
     <div class="hb" style="grid-template-columns:auto 1fr auto;margin-top:10px">
       <span class="n"><i class="sw" style="background:var(--stock)"></i>Over a year old</span><span></span><span class="v">${f(agedTotal)}</span>
-      <span class="n"><i class="sw" style="background:var(--stock-soft);box-shadow:inset 0 0 0 1px var(--line)"></i>Less than a year old</span><span></span><span class="v">${f(T.end - agedTotal)}</span>
+      <span class="n"><i class="sw" style="background:var(--stock-soft);box-shadow:inset 0 0 0 1px var(--line)"></i>Other closing inventory</span><span></span><span class="v">${f(T.end - agedTotal)}</span>
       <span class="n" style="font-weight:600">Total on hand</span><span></span><span class="v">${f(T.end)}</span></div>`;
   $("takeShare").textContent = `${pc(share,1)} of the ${f(T.end)} cases on hand at the end of ${monthName} were received before ${fd(cutoff.toISOString().slice(0,10))}.`;
 
@@ -923,7 +933,7 @@ $("howProducts").innerHTML = `<p>For each part number: <span class="formula">Ope
   sortable($("agedTable"), st, draw);
   $("agedTable").querySelector('th[data-k="pcs"]').setAttribute("aria-sort","descending");
   draw();
-  $("howAged").innerHTML = `<p>Every case still on hand that was received on a warehouse receipt dated more than 365 days before ${fd(M.end)}. Age is <span class="formula">${fd(M.end)} − receipt date</span>, in calendar days.</p><p>Select a product to see each receipt it came in on. “Total cases on hand” is the product’s full closing stock, so you can see how much of it is older stock.</p>`;
+  $("howAged").innerHTML = `<p>Source: Inventory &gt;1 Year worksheet, grouped by product and receipt. Only rows received on a warehouse receipt dated more than 365 days before ${fd(M.end)}. Age is <span class="formula">${fd(M.end)} − receipt date</span>, in calendar days. The remaining closing inventory is not independently aged by this worksheet.</p><p>Select a product to see each receipt it came in on. “Total cases on hand” is the product’s full closing stock, so you can see how much of it is older stock.</p>`;
 })();
 
 /* ---------- definitions & footer ---------- */
@@ -941,6 +951,7 @@ $("defs").innerHTML = [
   ["Cycle count", "A count of selected stock locations to confirm system quantities match what is physically on the shelf."],
   ["Stock held over a year", "Cases still on hand from a warehouse receipt dated more than 365 days before the end of the reporting period."]
 ].map(([t,d]) => `<dt>${t}</dt><dd>${d}</dd>`).join("");
+$("sourceIdentity").textContent = `Source workbook: ${M.sourceFile || "not recorded"} · SHA-256: ${M.sourceSha256 || "not recorded"}`;
 $("foot1").textContent = `WTDC · Monthly warehouse report for ${M.customer} · ${monthYear}`;
 $("foot2").textContent = `Figures are taken from WTDC’s warehouse records for ${fd(M.start).replace(/, \d{4}$/,"")} to ${fd(M.end)}${M.runDate ? `, compiled ${fd(M.runDate)}` : ""}. Questions about this report: contact your WTDC account representative.`;
 

@@ -18,6 +18,7 @@ import argparse
 import collections
 import datetime as dt
 import json
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -186,7 +187,11 @@ def read_kpi(wb_vals):
         orders.append(dict(release=str(num(row[0])), po=str(num(row[1]) or ""), pro=str(clean(row[2]) or ""),
                            consignee=clean(row[3]), created=iso(created), confirmed=iso(confirmed),
                            picked=iso(picked), delivered=iso(delivered), d1=d1, d2=d2, d3=d3,
-                           notes=clean(row[11]) or ""))
+                           notes=clean(row[11]) or "",
+                           totalDays=networkdays_minus_one(created, delivered),
+                           validStages=all(iso(v) for v in (created, confirmed, picked, delivered))
+                           and created <= confirmed <= picked <= delivered
+                           and all(v is not None and v >= 0 for v in (d1, d2, d3))))
     return orders
 
 
@@ -228,7 +233,7 @@ def read_accident(wb_vals):
 
 
 # ---------------------------------------------------------------- build
-def build(xlsx: Path, out_dir: Path):
+def build(xlsx: Path, out_dir: Path, draft=False):
     wb = openpyxl.load_workbook(xlsx, data_only=True)
     period = read_period(find_sheet(wb, "In Out Summary"))
     products, totals = read_summary(find_sheet(wb, "In Out Summary"))
@@ -258,7 +263,8 @@ def build(xlsx: Path, out_dir: Path):
         g["pcs"] += r["pcs"]
 
     data = dict(
-        meta=dict(customer=customer, **period, generated=dt.date.today().isoformat()),
+        meta=dict(customer=customer, **period, generated=dt.date.today().isoformat(),
+                  sourceFile=xlsx.name, sourceSha256=hashlib.sha256(xlsx.read_bytes()).hexdigest()),
         overview=overview,
         products=products,
         totals=totals,
@@ -272,14 +278,20 @@ def build(xlsx: Path, out_dir: Path):
     )
 
     issues = checks(data, ins, outs)
+    data['meta']['draft'] = bool(issues['issues'])
+    if issues['issues'] and not draft:
+        return None, issues
 
     html = TEMPLATE.read_text(encoding="utf-8")
     payload = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("</", "<\\/")
+    if html.count("/*__REPORT_DATA__*/null") != 1:
+        raise ValueError('Template must contain exactly one data placeholder')
     html = html.replace("/*__REPORT_DATA__*/null", payload)
     month_name = MONTHS[period["month"] - 1]
     safe_customer = re.sub(r"[^A-Za-z0-9]+", "-", customer or "Customer").strip("-")
     out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"WTDC-Monthly-Report-{safe_customer}-{month_name}-{period['year']}.html"
+    prefix = 'DRAFT-' if data['meta']['draft'] else ''
+    out = out_dir / f"{prefix}WTDC-Monthly-Report-{safe_customer}-{month_name}-{period['year']}.html"
     out.write_text(html, encoding="utf-8")
     return out, issues
 
@@ -300,7 +312,8 @@ def checks(d, ins, outs):
     bad = [p["part"] for p in P if p["start"] + p["inb"] - p["out"] != p["end"]]
     (issues if bad else ok).append(f"Start + In - Out = End for every product" + (f" (fails: {', '.join(bad)})" if bad else ""))
     if d["totals"]:
-        same("Summary total row vs sum of products (end)", d["totals"]["end"], s["end"])
+        for source, key in [('start', 'start'), ('in', 'inb'), ('out', 'out'), ('end', 'end')]:
+            same(f"Summary total row vs sum of products ({source})", d['totals'][source], s[key])
     same("Cases received: summary vs Overview", s["inb"], last("Inbound Cases Volume"))
     same("Cases shipped: summary vs Overview", s["out"], last("Outbound Cases Volume"))
     same("Month-end inventory: summary vs Overview", s["end"], last("Month End Inventory"))
@@ -329,7 +342,12 @@ def checks(d, ins, outs):
     over = [a for a in d["aged"] if a["date"] and a["date"] > (dt.date.fromisoformat(d["meta"]["end"]) - dt.timedelta(days=365)).isoformat()]
     if over:
         issues.append(f"{len(over)} 'Inventory >1 Year' lines were received less than a year before {d['meta']['end']}")
-    ok.append(f"Inventory held over one year: {aged_total:,} cases on {len({a['wr'] for a in d['aged']})} receipts")
+    ok.append(f"Aging worksheet: {aged_total:,} cases on {len({a['wr'] for a in d['aged']})} receipts")
+    if not P:
+        issues.append('No products were found')
+    for o in d['orders']:
+        if not o['delivered'] or not (d['meta']['start'] <= o['delivered'] <= d['meta']['end']):
+            issues.append(f"KPI order {o['release']}: missing delivery or delivery outside report period")
     return dict(ok=ok, issues=issues)
 
 
@@ -337,9 +355,10 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("workbook", type=Path)
     ap.add_argument("-o", "--out", type=Path, default=HERE / "output")
+    ap.add_argument('--draft', action='store_true', help='Write a visibly marked draft despite validation issues')
     a = ap.parse_args()
-    out, res = build(a.workbook, a.out)
-    print(f"\nReport written: {out}\n")
+    out, res = build(a.workbook, a.out, draft=a.draft)
+    print(f"\nReport written: {out}\n" if out else '\nReport blocked: resolve checks or use --draft for internal review.\n')
     print("Internal checks (not shown to the customer)")
     for line in res["ok"]:
         print(f"  OK     {line}")
@@ -349,7 +368,8 @@ def main():
         print(f"\n{len(res['issues'])} item(s) to review in the workbook before sending.")
     else:
         print("\nEverything reconciles.")
+    return 2 if res['issues'] else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
