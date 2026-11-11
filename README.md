@@ -1,11 +1,26 @@
-# WTDC customer dashboard — exact HTML replica
+# WTDC customer dashboard — original application replica
 
 **Open `index.html` in Edge or Chrome to see the exact requested dashboard.**
 
-`index.html` is a byte-for-byte copy of the supplied
-`WTDC-Interactive-Customer-Report-Campari-America-LLC-September-1-30-2026 (1).html`.
-Layout, charts, filters, wording, calculations and embedded dummy data are
-unchanged. No installation, build, server or upload is required.
+`index.html` packages the original client application shown in the screenshots
+from https://kpi-dashboard.wtdc-3927.chatgpt.site, not its differently designed
+exported customer HTML. The original React component, stylesheet, export
+function and WTDC logo were retrieved from Sites source commit
+`2150586d2693d60133b8870838550738f6adad5d` and retained unchanged under `app/`
+and `public/`. React, charts, icons, Excel parsing and the logo are embedded
+in the standalone HTML; no CDN, hosted runtime or server is required.
+
+The blank workbook-loading screen is the internal WTDC interface shown in the
+screenshots. Load a local Excel workbook to interact with the dashboard.
+Its original Export interactive report action generates a separate, preloaded
+read-only customer HTML file. That export has the original site's export design,
+which differs from the internal application layout.
+
+To edit in VS Code: change `app/page.tsx` or `app/globals.css`, then run
+`npm ci` once and `npm run build`. Reopen or refresh `index.html`.
+`app/offline-entry.tsx` and `scripts/build-offline.mjs` replace only the hosted
+Next.js entry point with a local browser bundle. No Sites authentication,
+database, Cloudflare deployment or cloud configuration is copied.
 
 In VS Code, right-click `index.html`, choose Reveal in File Explorer, then
 double-click it. Do not deploy customer data to GitHub Pages.
