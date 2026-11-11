@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { buildCustomerInteractiveReportHtml } from "./interactive-report";
+import { buildCurrentPageExport } from "./current-page-export";
+const snapshot = (globalThis as any).__WTDC_SNAPSHOT__;
+const restore = (key: string, fallback: any) => snapshot?.view?.[key] ?? fallback;
 import {
   Bar, BarChart, CartesianGrid, Cell, ComposedChart, Legend, Line, LineChart,
   Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -193,25 +195,26 @@ function groupAgingByPart(rows: AgingRow[]) {
 
 function VolumeChart({ title, series }: { title: string; series: VolumeSeries[] }) {
   const years = [...series].sort((a,b) => Number(b.year)-Number(a.year));
-  const [selected, setSelected] = useState<string[] | null>(null);
-  const [showTable, setShowTable] = useState(false);
+  const [selected, setSelected] = useState<string[] | null>(snapshot?.volumes?.[title]?.selected ?? null);
+  const [showTable, setShowTable] = useState(snapshot?.volumes?.[title]?.showTable ?? false);
+  useEffect(() => { const g = globalThis as any; g.__WTDC_VOLUMES__ ??= {}; g.__WTDC_VOLUMES__[title] = {selected, showTable}; }, [title, selected, showTable]);
   const active = selected ?? years.slice(0,2).map(item => item.year);
   const colors = ["#002D62", "#B57B16", "#167D8D", "#8352A3", "#C44E52", "#477A38", "#6C647D"];
   return <article className="panel chart-panel volume-panel"><div className="panel-head"><div><span>{title}</span><strong>Monthly cases</strong></div><button className="button ghost" type="button" onClick={() => setShowTable(!showTable)}>{showTable ? "Hide values" : "Show values"}</button></div><div className="year-controls" aria-label={`${title} years`}>{years.map((item,index) => <label key={item.year} style={{ borderColor: active.includes(item.year) ? colors[index % colors.length] : undefined }}><input type="checkbox" checked={active.includes(item.year)} onChange={() => setSelected(active.includes(item.year) ? active.filter(year => year !== item.year) : [...active,item.year])} /><span style={{ color: colors[index % colors.length] }}>●</span>{item.year}</label>)}</div><div className="volume-plot">{series.length && active.length ? <ResponsiveContainer width="100%" height="100%"><LineChart data={volumeChartData(series)} margin={{top:20,right:24,left:12,bottom:12}}><CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" vertical={false}/><XAxis dataKey="month" interval="preserveStartEnd" minTickGap={15} tick={{fontSize:13,fill:"#334155"}} tickLine={false} axisLine={{stroke:"#cbd5e1"}} height={35}/><YAxis width={65} tick={{fontSize:12,fill:"#475569"}} tickLine={false} axisLine={false} tickFormatter={value => formatNumber(value,true)} /><Tooltip contentStyle={{borderRadius:8,border:"1px solid #cbd5e1",fontSize:14}} labelFormatter={label => `${label} · cases`} formatter={(value,name) => [formatNumber(Number(value)),String(name)]}/>{years.filter(item => active.includes(item.year)).map(item => <Line key={item.year} dataKey={item.year} type="linear" stroke={colors[years.findIndex(y=>y.year===item.year)%colors.length]} strokeWidth={3} dot={{r:3,strokeWidth:2,fill:"white"}} activeDot={{r:6}} connectNulls={false}/>)}</LineChart></ResponsiveContainer> : <EmptyPanel icon={<TrendingUp />} text={series.length ? "Select a year above to view its monthly volumes." : "Load a workbook to view monthly volumes."}/>}</div>{showTable && <div className="table-scroll"><table><thead><tr><th>Month</th>{years.filter(item=>active.includes(item.year)).map(item=><th key={item.year}>{item.year}</th>)}</tr></thead><tbody>{MONTHS.map((month,index)=><tr key={month}><td>{month}</td>{years.filter(item=>active.includes(item.year)).map(item=><td key={item.year}>{item.values[index] == null ? "—" : formatNumber(item.values[index])}</td>)}</tr>)}</tbody></table></div>}</article>;
 }
 
 export default function Home() {
-  const [report, setReport] = useState<ReportData | null>(null);
-  const [loadStage, setLoadStage] = useState<LoadStage>("idle");
-  const [notice, setNotice] = useState("No customer report is loaded. Choose or drop an Excel workbook to begin.");
+  const [report, setReport] = useState<ReportData | null>(() => snapshot?.report ? JSON.parse(JSON.stringify(snapshot.report), (key, value) => ["reportDate", "creation", "confirmation", "pick", "pickup", "receiptDate", "entryDate", "customsDate"].includes(key) && typeof value === "string" ? new Date(value) : value) : null);
+  const [loadStage, setLoadStage] = useState<LoadStage>(snapshot ? "success" : "idle");
+  const [notice, setNotice] = useState(restore("notice", "No customer report is loaded. Choose or drop an Excel workbook to begin."));
   const [dragging, setDragging] = useState(false);
-  const [selectedPart, setSelectedPart] = useState("");
-  const [selectedReceipt, setSelectedReceipt] = useState("");
-  const [selectedConsignee, setSelectedConsignee] = useState("");
-  const [movementSearch, setMovementSearch] = useState("");
-  const [detailSearch, setDetailSearch] = useState("");
-  const [agingSearch, setAgingSearch] = useState("");
-  const [detailPage, setDetailPage] = useState(1);
+  const [selectedPart, setSelectedPart] = useState(restore("selectedPart", ""));
+  const [selectedReceipt, setSelectedReceipt] = useState(restore("selectedReceipt", ""));
+  const [selectedConsignee, setSelectedConsignee] = useState(restore("selectedConsignee", ""));
+  const [movementSearch, setMovementSearch] = useState(restore("movementSearch", ""));
+  const [detailSearch, setDetailSearch] = useState(restore("detailSearch", ""));
+  const [agingSearch, setAgingSearch] = useState(restore("agingSearch", ""));
+  const [detailPage, setDetailPage] = useState(restore("detailPage", 1));
   const [showExport, setShowExport] = useState(false);
   const [exportPackage, setExportPackage] = useState<{ url: string; name: string; size: number } | null>(null);
   const [exportStatus, setExportStatus] = useState<"idle" | "success" | "error">("idle");
@@ -277,7 +280,8 @@ export default function Home() {
     setExportPackage(null);
     if (!report) return;
     try {
-      const html = buildCustomerInteractiveReportHtml(report);
+      const volumes = (globalThis as any).__WTDC_VOLUMES__ ?? {};
+      const html = buildCurrentPageExport({report, view: {selectedPart, selectedReceipt, selectedConsignee, movementSearch, detailSearch, agingSearch, detailPage, notice}, volumes});
       const blob = new Blob([html], { type: "text/html;charset=utf-8" });
       const safePeriod = report.period.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "Customer-Report";
       const safeCustomer = report.customer.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "Customer";
