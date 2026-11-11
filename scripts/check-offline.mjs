@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { Script } from 'node:vm';
 import { build } from 'esbuild';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -13,6 +13,7 @@ new Script(script);
 assert.ok(!html.includes('@import "tailwindcss"'), 'Styles compiled');
 
 // Render the unchanged component without a browser to check every blank section.
+await mkdir('output', {recursive:true});
 await build({entryPoints:['app/page.tsx'], bundle:true, platform:'node',
   packages:'external', format:'esm', jsx:'automatic', outfile:'output/render-check.mjs'});
 const {default: Dashboard} = await import('../output/render-check.mjs');

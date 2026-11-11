@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {"build": "node scripts/build-offline.mjs", "test": "node scripts/check-offline.mjs"},
+  "engines": {"node": ">=22.13.0"},
+  "scripts": {
+    "build": "node scripts/build-offline.mjs",
+    "test": "npm run build && node scripts/check-offline.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
   "dependencies": {
     "react": "19.2.6",
     "react-dom": "19.2.6",

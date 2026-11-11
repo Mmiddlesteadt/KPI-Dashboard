@@ -1,101 +1,83 @@
-# WTDC customer dashboard — original application replica
+# WTDC KPI Dashboard
 
-**Open `index.html` in Edge or Chrome to see the exact requested dashboard.**
+## Open the project
 
-`index.html` packages the original client application shown in the screenshots
-from https://kpi-dashboard.wtdc-3927.chatgpt.site, not its differently designed
-exported customer HTML. The original React component, stylesheet, export
-function and WTDC logo were retrieved from Sites source commit
-`2150586d2693d60133b8870838550738f6adad5d` and retained unchanged under `app/`
-and `public/`. React, charts, icons, Excel parsing and the logo are embedded
-in the standalone HTML; no CDN, hosted runtime or server is required.
+The primary Windows checkout is `C:\Users\Marjorie\KPI-Dashboard`.
+Double-click `KPI-Dashboard.code-workspace`, or open that folder in VS Code.
+Use this checkout for edits, commits and pushes. The earlier OneDrive workspace
+is historical and is not the working location.
 
-The blank workbook-loading screen is the internal WTDC interface shown in the
-screenshots. Load a local Excel workbook to interact with the dashboard.
-Its original Export interactive report action generates a separate, preloaded
-read-only customer HTML file. That export has the original site's export design,
-which differs from the internal application layout.
+## Daily workflow
 
-To edit in VS Code: change `app/page.tsx` or `app/globals.css`, then run
-`npm ci` once and `npm run build`. Reopen or refresh `index.html`.
-`app/offline-entry.tsx` and `scripts/build-offline.mjs` replace only the hosted
-Next.js entry point with a local browser bundle. No Sites authentication,
-database, Cloudflare deployment or cloud configuration is copied.
+1. Open the workspace and VS Code Terminal.
+2. On first setup, or after dependency changes, run `npm ci`.
+3. Edit `app/page.tsx` (dashboard), `app/globals.css` (design), or
+   `app/interactive-report.ts` (customer export).
+4. Run `npm test`. This builds `index.html` and checks the standalone bundle.
+5. Run `npm run preview`, then open http://127.0.0.1:4173. Refresh after rebuilding.
+   Stop the preview with Ctrl+C. You can also open `index.html` directly offline.
+6. Review Source Control in VS Code, commit the intended code files, then Push
+   or Sync Changes. Work on a feature branch and merge through a pull request.
 
-In VS Code, right-click `index.html`, choose Reveal in File Explorer, then
-double-click it. Do not deploy customer data to GitHub Pages.
+VS Code's Terminal > Run Task also provides install, build, verify and preview.
+Ctrl+Shift+B runs the default build. The workspace uses LF line endings.
 
-The generator below is the previous implementation with a different design.
-It does **not** reproduce `index.html`; use `index.html` for the exact replica.
+## Architecture
 
-## Previous monthly customer report builder
+This is a browser-only React application, compiled into one portable HTML file.
+It needs no backend, account, database, cloud storage or hosted runtime.
+The local preview binds only to 127.0.0.1 and serves only the compiled dashboard;
+it does not expose the input or output directories.
 
-Turns the internal monthly KPI workbook into one self-contained, read-only HTML
-report for the customer. Everything runs on a WTDC computer. Nothing is uploaded
-or hosted anywhere.
-
-## Rule number one
-This repository holds code only. Real customer workbooks go in `input/` and
-finished reports come out in `output/`. Both folders are blocked from Git by
-`.gitignore`. This prevents ordinary Git staging; it is not a security boundary
-and can be overridden with `git add -f`. Do not force-add customer data. The only
-workbook in the repo is the dummy file in `sample_data/`.
-
-## One-time setup
-1. Install Python 3.10 or newer.
-2. In this folder, run: `pip install -r requirements.txt`
-
-## Each month
-1. Save the month's workbook into `input/`.
-2. Run: `python build_report.py input/Campari_October_2026_KPI.xlsx`
-3. Read the checks printed in the terminal. Any CHECK blocks report generation
-   and exits with code 2. Fix the workbook and run again. For internal review,
-   add `--draft` to generate a file with a DRAFT filename and visible banner;
-   this still exits with code 2. Do not send drafts or stale reports from a
-   previous run. Only send the file named by a successful current build.
-4. Open the report from `output/` in a browser and skim it.
-5. Send it to the customer, then archive the report and its workbook
-   on the internal drive.
-
-## Try it with dummy data
-`python build_report.py sample_data/Sample_Campari_September_2026_KPI.xlsx --draft`
-
-The supplied sample has two orders with confirmation dates after pick dates.
-These remain visible in the order register but are excluded from step averages.
-Creation-to-delivery time is calculated directly from the endpoint dates.
-
-## Delivery architecture
-
-Use GitHub for reusable code and VS Code for development. Generate a single HTML
-file on a WTDC computer and send it through your approved customer delivery
-channel. No GitHub Pages, hosted app, database, cloud build, analytics, CDN, or
-external fonts are needed. The finished file includes its own data, styles,
-scripts and font. A Content Security Policy blocks network connections.
-
-Customers can search, sort, expand product/receipt details, compare years and
-print. They cannot upload or edit data through the interface. A downloaded HTML
-file is not tamper-proof: recipients can modify their own copy in an editor.
-Keep the approved original internally if you need an authoritative record.
-
-Every section has calculation notes; Definitions lists source worksheets and
-the workbook SHA-256 fingerprint. Filters affect their table only. Report totals
-stay fixed. Aging uses only supplied aging rows older than 365 days at period
-end; the rest of closing inventory is not assumed to have verified receipt ages.
-Orders are scoped by delivery date, including orders created in prior months.
-
-## Validation
-
-Run `python -m unittest -v`. Before delivery, open the generated HTML locally in
-Edge or Chrome and review desktop/mobile layout, search, sort, row expansion,
-year comparison and Print / Save PDF. Check offline behavior with networking off.
-The parser expects this workbook's worksheet names and column layout. Excel
-formulas must have current cached values: recalculate and save in Excel first.
-
-## Folder layout
-| Path | What it is |
+| Path | Purpose |
 | --- | --- |
-| `build_report.py` | Reads the workbook, runs the checks, writes the report |
-| `templates/report_template.html` | The report design, the same for every month |
-| `sample_data/` | Dummy workbook for testing changes |
-| `input/` | Real workbooks (never committed) |
-| `output/` | Finished reports (never committed) |
+| `app/page.tsx` | Original dashboard UI, Excel parsing and interactions |
+| `app/globals.css` | Original dashboard styling |
+| `app/interactive-report.ts` | Preloaded read-only customer HTML export |
+| `app/offline-entry.tsx` | Browser entry point |
+| `public/wtdc-logo.png` | WTDC logo, embedded during build |
+| `scripts/` | Build, verification and restricted local preview |
+| `index.html` | Generated, committed standalone internal application |
+| `package-lock.json` | Exact dependency resolution; use npm ci |
+| `input/` | Local customer workbooks; ignored by Git |
+| `output/` | Local reports and verification artifacts; ignored by Git |
+| `sample_data/` | Approved dummy workbook only |
+| `.github/workflows/verify.yml` | Code-only CI build and verification |
+
+No Next.js server or Cloudflare/Sites runtime is used. Node 22.13+ is required
+only for development. Customers do not need Node, Python or the Excel workbook.
+Do not edit generated `index.html` manually; rebuild it from `app/`.
+
+## Monthly customer delivery
+
+Open the internal dashboard, choose the month's Excel workbook, review the data,
+then select Export interactive report. Send the resulting HTML through WTDC's
+approved delivery channel. Customers receive a fixed data snapshot and can
+filter it without uploading files. The internal dashboard starts blank.
+
+The current export retains the original site's export design, which differs
+from its internal dashboard design. The internal application's component,
+stylesheet, logo and export function came from Sites source commit
+`2150586d2693d60133b8870838550738f6adad5d`.
+
+Customer workbooks, generated customer reports, credentials and real data must
+never be committed or used in cloud CI. Keep them in ignored folders. Gitignore
+prevents ordinary staging, but can be overridden; inspect staged changes before
+pushing. Downloaded HTML is editable by its recipient, so retain the approved
+original internally when an authoritative record is needed.
+
+## Verification scope
+
+`npm test` verifies compilation, JavaScript syntax, embedded assets and rendered
+blank-screen sections. It does not replace browser QA. Before a customer release,
+check workbook loading, filters, charts, export/reopening offline, and printing.
+CI runs only code and dummy-data checks; it does not publish or deploy reports.
+
+## Earlier Python generator
+
+`build_report.py`, `templates/report_template.html`, `requirements.txt` and
+`test_report.py` are a separate legacy report generator with a different layout.
+They are not needed for the primary React application. If maintaining it, use a
+local Python virtual environment and run `python -m unittest -v`. It blocks output
+on source issues unless `--draft` is requested. Do not mix its output with the
+primary dashboard's customer exports.

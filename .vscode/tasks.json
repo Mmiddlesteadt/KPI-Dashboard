@@ -1,0 +1,9 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {"label":"Dashboard: install dependencies", "type":"shell", "command":"npm ci", "problemMatcher":[]},
+    {"label":"Dashboard: build", "type":"shell", "command":"npm run build", "group":{"kind":"build","isDefault":true}, "problemMatcher":[]},
+    {"label":"Dashboard: verify", "type":"shell", "command":"npm test", "group":{"kind":"test","isDefault":true}, "problemMatcher":[]},
+    {"label":"Dashboard: preview", "type":"shell", "command":"npm run preview", "dependsOn":"Dashboard: build", "problemMatcher":[]}
+  ]
+}
