@@ -1,4 +1,19 @@
-# WTDC monthly customer report builder
+# WTDC customer dashboard — exact HTML replica
+
+**Open `index.html` in Edge or Chrome to see the exact requested dashboard.**
+
+`index.html` is a byte-for-byte copy of the supplied
+`WTDC-Interactive-Customer-Report-Campari-America-LLC-September-1-30-2026 (1).html`.
+Layout, charts, filters, wording, calculations and embedded dummy data are
+unchanged. No installation, build, server or upload is required.
+
+In VS Code, right-click `index.html`, choose Reveal in File Explorer, then
+double-click it. Do not deploy customer data to GitHub Pages.
+
+The generator below is the previous implementation with a different design.
+It does **not** reproduce `index.html`; use `index.html` for the exact replica.
+
+## Previous monthly customer report builder
 
 Turns the internal monthly KPI workbook into one self-contained, read-only HTML
 report for the customer. Everything runs on a WTDC computer. Nothing is uploaded
