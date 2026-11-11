@@ -1,4 +1,5 @@
-@import "tailwindcss";
+@import "tailwindcss" source(none);
+@source "./page.tsx";
 
 :root { --navy:#002d62; --navy-dark:#001f45; --gold:#ab8820; --gold-dark:#806516; --gold-soft:#f7f1df; --line:#dfe5ec; --paper:#ffffff; --canvas:#f4f6f9; --black:#000000; }
 * { box-sizing: border-box; }
