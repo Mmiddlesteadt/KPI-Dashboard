@@ -18,14 +18,14 @@ await build({entryPoints:['app/page.tsx'], bundle:true, platform:'node',
   packages:'external', format:'esm', jsx:'automatic', outfile:'output/render-check.mjs'});
 const {default: Dashboard} = await import('../output/render-check.mjs');
 const markup = renderToStaticMarkup(createElement(Dashboard));
-for (const label of ['Customer performance dashboard', 'Choose Excel file',
-  'Ending inventory', 'Creation-to-delivery service performance',
-  'Inventory older than one year', 'Inbound and outbound cases by month and year',
-  'Warehouse movements connected by part number and receipt']) {
-  assert.ok(markup.toLowerCase().includes(label.toLowerCase()), label);
+for (const label of ['Customer performance dashboard', 'Choose Excel file', 'Client / Excel format']) {
+  assert.ok(markup.includes(label), label);
+}
+for (const hidden of ['id="overview"', 'id="inventory"', 'id="orders"', 'id="aging"', 'id="volumes"', 'id="details"', 'class="section-nav"', 'class="sharing-guide"']) {
+  assert.ok(!markup.includes(hidden), `Blank dashboard hides ${hidden}`);
 }
 await writeFile('output/rendered-blank.html', markup);
-console.log('PASS: standalone bundle syntax, embedded assets, compiled styles and all reference sections.');
+console.log('PASS: standalone bundle syntax, embedded assets, compiled styles and blank upload screen.');
 
 // An exported report must explain calculations without exposing worksheet names.
 globalThis.__WTDC_SNAPSHOT__ = {report: {
@@ -39,7 +39,7 @@ globalThis.__WTDC_SNAPSHOT__ = {report: {
 }};
 const {default: ExportedDashboard} = await import('../output/render-check.mjs?export-check');
 const exportedMarkup = renderToStaticMarkup(createElement(ExportedDashboard));
-for (const forbidden of ['Source:', 'Overview worksheet', 'In Out Summary', 'KPI worksheet',
+for (const forbidden of ['Local processing', 'Source:', 'Overview worksheet', 'In Out Summary', 'KPI worksheet',
   'Inventory &gt;1 Year worksheet', 'Comparison worksheet', 'Days Accident Free sheet', 'private-source.xlsx']) {
   assert.ok(!exportedMarkup.includes(forbidden), `Export hides ${forbidden}`);
 }
@@ -48,11 +48,11 @@ assert.ok(exportedMarkup.includes('aria-label="How this is calculated"'), 'Calcu
 assert.ok(exportedMarkup.includes('aria-label="About this information"'), 'Direct values use informational wording');
 assert.ok(exportedMarkup.includes('net change is ending minus starting inventory.'), 'Headline calculation explained');
 assert.ok(exportedMarkup.includes('years equals days divided by 365.25'), 'Safety conversion explained');
-assert.ok(markup.includes('Source:'), 'Internal dashboard retains source guidance');
+assert.ok(!markup.includes('Source:'), 'Blank dashboard hides report guidance');
 delete globalThis.__WTDC_SNAPSHOT__;
 console.log('PASS: exported view hides worksheet references and distinguishes calculation help from information.');
 
-for (const [name, view, expected] of [['internal', markup, 8], ['exported', exportedMarkup, 9]]) {
+for (const [name, view, expected] of [['internal blank', markup, 0], ['exported', exportedMarkup, 9]]) {
   assert.equal((view.match(/class="calculation-help"/g) ?? []).length, expected, `${name}: one icon per report section`);
   for (const section of view.matchAll(/<section\b[^>]*>([\s\S]*?)<\/section>/g)) {
     assert.ok((section[1].match(/class="calculation-help"/g) ?? []).length <= 1, `${name}: no section has duplicate help icons`);

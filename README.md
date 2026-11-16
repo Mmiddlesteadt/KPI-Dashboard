@@ -50,7 +50,7 @@ Do not edit generated `index.html` manually; rebuild it from `app/`.
 
 ## Monthly customer delivery
 
-Open the internal dashboard, choose the month's Excel workbook, review the data,
+Open the internal dashboard, select the client and Excel format, choose the month's Excel workbook, review the data,
 then select Export interactive report. Send the resulting HTML through WTDC's
 approved delivery channel. Customers receive a fixed data snapshot and can
 filter it without uploading files. The internal dashboard starts blank.
@@ -87,3 +87,13 @@ They are not needed for the primary React application. If maintaining it, use a
 local Python virtual environment and run `python -m unittest -v`. It blocks output
 on source issues unless `--draft` is requested. Do not mix its output with the
 primary dashboard's customer exports.
+
+## Client Excel formats
+
+The client dropdown is configured by `CLIENT_PROFILES` in `app/page.tsx`.
+Campari America LLC and Jim Beam / Monthly KPI v1 are mapped formats.
+Jim Beam includes lot numbers, month-end storage and SKU histories.
+Each new client or version should register its own ID, label, expected-layout description
+and parser after its template is reviewed. Do not reuse a parser for a different
+layout without verifying its sheet names, header rows and column mappings.
+Changing the selection clears the loaded report, filters and prepared export.
