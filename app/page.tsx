@@ -294,7 +294,7 @@ export default function Home() {
   const clearReport = () => {
     if (report && !window.confirm("Clear this customer report and return the dashboard to blank?")) return;
     if (exportPackage) URL.revokeObjectURL(exportPackage.url);
-    setReport(null); clearSelections(); setLoadStage("idle"); setNotice("Report cleared. The dashboard is blank and ready for another customer workbook."); setShowExport(false); setExportPackage(null); setExportStatus("idle"); setExportMessage(""); if (inputRef.current) inputRef.current.value = "";
+    setClientProfileId(""); setReport(null); clearSelections(); setLoadStage("idle"); setNotice("Report cleared. The dashboard is blank and ready for another customer workbook."); setShowExport(false); setExportPackage(null); setExportStatus("idle"); setExportMessage(""); if (inputRef.current) inputRef.current.value = "";
   };
 
   const receiptParts = useMemo(() => { const values = new Set<string>(); if (!report || !selectedReceipt) return values; report.aging.filter((row) => row.receipt === selectedReceipt).forEach((row) => values.add(row.part)); report.details.filter((row) => row.receipt === selectedReceipt).forEach((row) => values.add(row.part)); return values; }, [report, selectedReceipt]);
@@ -365,7 +365,7 @@ export default function Home() {
         setReport(null); clearSelections(); setLoadStage("idle"); setShowExport(false); setExportPackage(null); setExportStatus("idle"); setExportMessage("");
         setNotice("Client format changed. Choose a workbook for the selected client.");
         if (inputRef.current) inputRef.current.value = "";
-      }}><option value="">Select a client and format…</option>{CLIENT_PROFILES.map(profile => <option key={profile.id} value={profile.id}>{profile.client} — {profile.version}</option>)}</select></div>
+      }}><option value="">Select</option>{CLIENT_PROFILES.map(profile => <option key={profile.id} value={profile.id}>{profile.client} — {profile.version}</option>)}</select></div>
       <div className="format-description" id="format-description"><strong>{clientProfile ? clientProfile.parse ? "Expected Excel format" : "Excel template needed" : "Choose the client before uploading"}</strong><p>{clientProfile?.description ?? "Each client uses its own workbook format. Select a configured client to view the required worksheets and load its report."}</p><small>Additional clients and versions will appear here once their Excel templates are configured.</small></div>
     </section>}
     <div className="report-actions-grid">
