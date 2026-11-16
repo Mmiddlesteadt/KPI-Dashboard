@@ -55,10 +55,16 @@ then select Export interactive report. Send the resulting HTML through WTDC's
 approved delivery channel. Customers receive a fixed data snapshot and can
 filter it without uploading files. The internal dashboard starts blank.
 
-The current export retains the original site's export design, which differs
-from its internal dashboard design. The internal application's component,
-stylesheet, logo and export function came from Sites source commit
-`2150586d2693d60133b8870838550738f6adad5d`.
+The export uses the same dashboard design and preserves the current report,
+filters and selected volume years. The exported view hides worksheet references
+and the Excel filename. Each report section has one information icon with a
+brief explanation of no more than five sentences. Calculation explanations are
+labeled separately from general information; internal source guidance remains
+available in the working dashboard. Data parsing and calculation rules are
+unchanged by these presentation updates.
+
+The original internal component, stylesheet and logo came from Sites source
+commit `2150586d2693d60133b8870838550738f6adad5d`.
 
 Customer workbooks, generated customer reports, credentials and real data must
 never be committed or used in cloud CI. Keep them in ignored folders. Gitignore
